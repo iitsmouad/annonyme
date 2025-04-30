@@ -18,7 +18,7 @@ let messages = {
 };
 
 // L'URL de ton webhook Discord
-const webhookURL = 'https://discord.com/api/webhooks/1366565277981999194/xSXnfnQIpUTOZwTIex5ODpYWNPVjDy77vYhXnGcCbWePWaEVI5VjmfP2I_6_Pa0QQuVG';
+const webhookURL = 'VOTRE_WEBHOOK_DISCORD_URL';
 
 // Auth routes
 app.post("/login", (req, res) => {
@@ -52,10 +52,13 @@ const wss = new WebSocket.Server({ server });
 
 // WebSocket
 wss.on("connection", (ws, req) => {
-  const userIP = req.socket.remoteAddress; // Récupérer l'IP v4 de l'utilisateur
-  const username = req.headers['username'] || 'Anonyme'; // Récupérer le nom d'utilisateur, ou 'Anonyme'
+  // Récupérer l'IP de l'utilisateur (derrière un proxy ou pas)
+  const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;  // Priorité à l'IP dans le header
 
-  // Envoi au Webhook Discord dès qu'un utilisateur se connecte
+  // Nom d'utilisateur envoyé dans le WebSocket
+  const username = req.headers['username'] || 'Anonyme'; // Utilisateur par défaut si non défini
+
+  // Envoi du message au Webhook Discord
   sendWebhook(username, userIP);
 
   ws.on("message", (data) => {
@@ -74,10 +77,14 @@ wss.on("connection", (ws, req) => {
 
 // Fonction pour envoyer un message au Webhook Discord avec l'IP v4 et le nom d'utilisateur
 function sendWebhook(username, ip) {
+  // Nettoyer l'IP si elle vient avec un préfixe (ex: "127.0.0.1, ::ffff:127.0.0.1")
+  const cleanIP = ip.split(',')[0].trim();
+
   const message = {
-    content: `Nouvelle connexion :\n**Nom d'utilisateur**: ${username}\n**IP v4**: ${ip}`
+    content: `Nouvelle connexion :\n**Nom d'utilisateur**: ${username}\n**IP v4**: ${cleanIP}`
   };
 
+  // Envoi via axios
   axios.post(webhookURL, message)
     .then(response => {
       console.log('Message envoyé à Discord');
