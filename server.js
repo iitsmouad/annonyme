@@ -18,7 +18,7 @@ let messages = {
 };
 
 // L'URL de ton webhook Discord
-const webhookURL = 'VOTRE_WEBHOOK_DISCORD_URL';
+const webhookURL = 'https://discord.com/api/webhooks/1366565277981999194/xSXnfnQIpUTOZwTIex5ODpYWNPVjDy77vYhXnGcCbWePWaEVI5VjmfP2I_6_Pa0QQuVG';
 
 // Auth routes
 app.post("/login", (req, res) => {
