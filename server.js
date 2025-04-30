@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const WebSocket = require("ws");
+const axios = require("axios");
 
 const app = express();
 app.use(cors());
@@ -15,6 +16,9 @@ let messages = {
   mèmes: [],
   INSULTE: [],
 };
+
+// L'URL de ton webhook Discord
+const webhookURL = 'VOTRE_WEBHOOK_DISCORD_URL';
 
 // Auth routes
 app.post("/login", (req, res) => {
@@ -47,7 +51,12 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // WebSocket
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
+  const userIP = req.connection.remoteAddress; // Récupérer l'IP de l'utilisateur
+
+  // Envoi au Webhook Discord dès qu'un utilisateur se connecte
+  sendWebhook(userIP);
+
   ws.on("message", (data) => {
     const msg = JSON.parse(data);
     if (!messages[msg.category]) messages[msg.category] = [];
@@ -61,6 +70,21 @@ wss.on("connection", (ws) => {
     });
   });
 });
+
+// Fonction pour envoyer un message au Webhook Discord avec l'IP de la connexion
+function sendWebhook(ip) {
+  const message = {
+    content: `Nouvelle connexion :\n**IP**: ${ip}`
+  };
+
+  axios.post(webhookURL, message)
+    .then(response => {
+      console.log('Message envoyé à Discord');
+    })
+    .catch(error => {
+      console.error('Erreur lors de l\'envoi du message au webhook Discord:', error);
+    });
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
