@@ -1,13 +1,15 @@
 const express = require("express");
 const http = require("http");
-const cors = require("cors");
 const WebSocket = require("ws");
 const axios = require("axios");
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
+// L'URL de ton webhook Discord
+const webhookURL = 'https://discord.com/api/webhooks/1366565277981999194/xSXnfnQIpUTOZwTIex5ODpYWNPVjDy77vYhXnGcCbWePWaEVI5VjmfP2I_6_Pa0QQuVG';
+
+// Exemple de base de données en mémoire pour les utilisateurs
 let users = {}; // temporaire en mémoire
 let messages = {
   général: [],
@@ -17,10 +19,7 @@ let messages = {
   INSULTE: [],
 };
 
-// L'URL de ton webhook Discord
-const webhookURL = 'https://discord.com/api/webhooks/1366565277981999194/xSXnfnQIpUTOZwTIex5ODpYWNPVjDy77vYhXnGcCbWePWaEVI5VjmfP2I_6_Pa0QQuVG';
-
-// Auth routes
+// Auth routes (login et register)
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
   if (users[username] === password) {
@@ -40,33 +39,35 @@ app.post("/register", (req, res) => {
   }
 });
 
-// Message history
+// Route pour récupérer l'historique des messages
 app.get("/messages/:category", (req, res) => {
   const category = req.params.category;
   res.json(messages[category] || []);
 });
 
-// Création du serveur HTTP + WS
+// Création du serveur HTTP et WebSocket
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// WebSocket
+// WebSocket connection
 wss.on("connection", (ws, req) => {
-  // Récupérer l'IP de l'utilisateur (derrière un proxy ou pas)
-  const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;  // Priorité à l'IP dans le header
+  // Récupérer l'IP de l'utilisateur (si serveur derrière un proxy)
+  const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;  // IP publique
+  const username = req.headers['username'] || 'Anonyme'; // Nom d'utilisateur
 
-  // Nom d'utilisateur envoyé dans le WebSocket
-  const username = req.headers['username'] || 'Anonyme'; // Utilisateur par défaut si non défini
+  // Récupérer les informations du navigateur et du système d'exploitation
+  const userAgent = req.headers['user-agent'];
+  const platform = req.headers['platform'];
 
-  // Envoi du message au Webhook Discord
-  sendWebhook(username, userIP);
+  // Envoi de ces informations au Webhook Discord
+  sendWebhook(username, userAgent, platform, userIP);
 
   ws.on("message", (data) => {
     const msg = JSON.parse(data);
     if (!messages[msg.category]) messages[msg.category] = [];
     messages[msg.category].push({ username: msg.username, message: msg.message });
 
-    // Broadcast à tous
+    // Broadcast le message à tous les clients
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify(msg));
@@ -75,16 +76,14 @@ wss.on("connection", (ws, req) => {
   });
 });
 
-// Fonction pour envoyer un message au Webhook Discord avec l'IP v4 et le nom d'utilisateur
-function sendWebhook(username, ip) {
-  // Nettoyer l'IP si elle vient avec un préfixe (ex: "127.0.0.1, ::ffff:127.0.0.1")
-  const cleanIP = ip.split(',')[0].trim();
-
+// Fonction pour envoyer un message au Webhook Discord
+function sendWebhook(username, userAgent, platform, ip) {
+  // Message format pour Discord
   const message = {
-    content: `Nouvelle connexion :\n**Nom d'utilisateur**: ${username}\n**IP v4**: ${cleanIP}`
+    content: `Nouvelle connexion :\n**Nom d'utilisateur**: ${username}\n**Navigateur et OS**: ${userAgent}\n**Plateforme**: ${platform}\n**IP**: ${ip}`
   };
 
-  // Envoi via axios
+  // Envoi au Webhook Discord via Axios
   axios.post(webhookURL, message)
     .then(response => {
       console.log('Message envoyé à Discord');
@@ -94,7 +93,8 @@ function sendWebhook(username, ip) {
     });
 }
 
+// Lancer le serveur
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`✅ Serveur backend et WebSocket sur le port ${PORT}`);
+  console.log(`Serveur WebSocket et HTTP en ligne sur le port ${PORT}`);
 });
