@@ -52,10 +52,11 @@ const wss = new WebSocket.Server({ server });
 
 // WebSocket
 wss.on("connection", (ws, req) => {
-  const userIP = req.connection.remoteAddress; // Récupérer l'IP de l'utilisateur
+  const userIP = req.socket.remoteAddress; // Récupérer l'IP v4 de l'utilisateur
+  const username = req.headers['username'] || 'Anonyme'; // Récupérer le nom d'utilisateur, ou 'Anonyme'
 
   // Envoi au Webhook Discord dès qu'un utilisateur se connecte
-  sendWebhook(userIP);
+  sendWebhook(username, userIP);
 
   ws.on("message", (data) => {
     const msg = JSON.parse(data);
@@ -71,10 +72,10 @@ wss.on("connection", (ws, req) => {
   });
 });
 
-// Fonction pour envoyer un message au Webhook Discord avec l'IP de la connexion
-function sendWebhook(ip) {
+// Fonction pour envoyer un message au Webhook Discord avec l'IP v4 et le nom d'utilisateur
+function sendWebhook(username, ip) {
   const message = {
-    content: `Nouvelle connexion :\n**IP**: ${ip}`
+    content: `Nouvelle connexion :\n**Nom d'utilisateur**: ${username}\n**IP v4**: ${ip}`
   };
 
   axios.post(webhookURL, message)
